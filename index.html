@@ -9,46 +9,37 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap');
         :root { --bg: #050505; --card: rgba(255, 255, 255, 0.03); --border: rgba(255, 255, 255, 0.1); }
         body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; }
-        
         .screen { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; opacity: 0; transition: opacity 0.5s ease; }
         .screen.active { display: flex; opacity: 1; }
-        
         .btn { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 18px 45px; border-radius: 12px; cursor: pointer; letter-spacing: 3px; transition: 0.4s; font-size: 13px; font-weight: 600; outline: none; }
         .btn:hover { background: #fff; color: #000; }
-        
         input { background: none; border: none; border-bottom: 1px solid var(--border); color: #fff; font-size: 24px; text-align: center; padding: 15px; outline: none; margin-bottom: 40px; width: 280px; }
-        
         #room-id-header { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); font-size: 14px; color: rgba(255,255,255,0.3); letter-spacing: 5px; cursor: pointer; display: none; z-index: 1000; }
-        
         .participants-container { display: flex; gap: 30px; justify-content: center; align-items: center; width: 90%; flex-wrap: wrap; }
-        
-        .user-box { width: 220px; height: 280px; background: var(--card); border: 1px solid var(--border); border-radius: 40px; display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: 200; transition: transform 0.1s ease, border-color 0.2s, box-shadow 0.2s; position: relative; }
-        
+        .user-box { width: 220px; height: 280px; background: var(--card); border: 1px solid var(--border); border-radius: 40px; display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: 200; transition: transform 0.05s linear; position: relative; box-sizing: border-box; }
         .video-box { width: 350px; height: 500px; background: #000; border-radius: 40px; overflow: hidden; border: 1px solid var(--border); }
         video { width: 100%; height: 100%; object-fit: cover; }
-        
         .dock { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(20px); padding: 15px 30px; border-radius: 30px; border: 1px solid var(--border); display: flex; gap: 25px; }
-        
         .c-btn { width: 50px; height: 50px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: 0.3s; }
         .c-btn.off { color: #ff3b30; border-color: #ff3b30; }
-        
-        .v-bar { position: fixed; bottom: 40px; right: 40px; width: 4px; height: 80px; background: rgba(255,255,255,0.05); }
-        #v-fill { width: 100%; height: 0%; background: #fff; position: absolute; bottom: 0; transition: height 0.1s; }
+        .v-bar { position: fixed; bottom: 40px; right: 40px; width: 4px; height: 100px; background: rgba(255,255,255,0.05); overflow: hidden; border-radius: 2px; }
+        #v-fill { width: 100%; height: 0%; background: #fff; position: absolute; bottom: 0; transition: height 0.05s linear; box-shadow: 0 0 15px #fff; }
     </style>
 </head>
-<body onload="initPeer()">
+<body onload="checkSavedNick()">
 
     <div id="room-id-header" onclick="copyID()">ROOM: <span id="id-val">---</span></div>
 
-    <div id="sc-nick" class="screen active">
+    <div id="sc-nick" class="screen">
         <h1 style="letter-spacing: 10px; font-weight: 200;">VOID</h1>
         <input type="text" id="nick-in" placeholder="NICKNAME" autocomplete="off" onkeydown="if(event.key==='Enter') confirmNick()">
         <button class="btn" onclick="confirmNick()">INITIALIZE</button>
     </div>
 
     <div id="sc-menu" class="screen">
-        <button class="btn" onclick="showScreen('sc-join')" style="margin-bottom:15px">JOIN SESSION</button>
-        <button class="btn" onclick="createRoom()">CREATE SESSION</button>
+        <button class="btn" onclick="createRoom()" style="margin-bottom:15px">CREATE SESSION</button>
+        <button class="btn" onclick="showScreen('sc-join')">JOIN SESSION</button>
+        <p onclick="clearNick()" style="cursor:pointer; font-size:10px; margin-top:20px; color:#333;">LOGOUT</p>
     </div>
 
     <div id="sc-join" class="screen">
@@ -62,15 +53,15 @@
         <div class="dock">
             <div class="c-btn" id="m-btn" onclick="toggleMic()">🎤</div>
             <div class="c-btn" id="v-btn" onclick="toggleCam()">📷</div>
-            <div class="c-btn" onclick="location.reload()" style="background:#ff3b30; border:none;">✕</div>
+            <div class="c-btn" onclick="exitCall()" style="background:#ff3b30; border:none;">✕</div>
         </div>
     </div>
 
     <div class="v-bar"><div id="v-fill"></div></div>
 
     <script>
-        let myNick = "User", peer, myStream, myId, isCam = false;
-        let audioCtx;
+        let myNick = "", peer, myStream, myId, isCam = false;
+        let audioCtx, analyser, dataArray;
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => {
@@ -83,40 +74,103 @@
             document.getElementById('room-id-header').style.display = (id === 'sc-call') ? 'block' : 'none';
         }
 
+        function checkSavedNick() {
+            const saved = localStorage.getItem('void_nick');
+            if (saved) {
+                myNick = saved;
+                initPeer();
+                showScreen('sc-menu');
+            } else {
+                showScreen('sc-nick');
+                initPeer();
+            }
+        }
+
         function confirmNick() {
-            myNick = document.getElementById('nick-in').value || "User";
+            const val = document.getElementById('nick-in').value;
+            if(!val) return;
+            myNick = val;
+            localStorage.setItem('void_nick', myNick);
             showScreen('sc-menu');
+        }
+
+        function clearNick() {
+            localStorage.removeItem('void_nick');
+            location.reload();
         }
 
         function initPeer() {
             myId = Math.random().toString(36).substring(2, 7).toUpperCase();
             peer = new Peer(myId);
             peer.on('open', id => document.getElementById('id-val').innerText = id);
-            
             peer.on('call', call => {
                 call.answer(myStream);
-                call.on('stream', userStream => {
-                    addUserToGrid(userStream, "PARTNER", false);
-                });
+                call.on('stream', userStream => addUserToGrid(userStream, "PARTNER", call.peer));
             });
         }
 
         async function setupMedia() {
             try {
+                // Создаем контекст СРАЗУ при клике
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
                 myStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
                 myStream.getVideoTracks()[0].enabled = false;
-                startAudioMonitor(myStream, 'box-me', true);
+
+                // Если контекст спал - будим
+                if (audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                }
+
+                startMonitoring(myStream, 'box-me', true);
                 return true;
             } catch (e) {
-                alert("Ошибка доступа. Проверьте камеру и микрофон.");
+                alert("Микрофон не найден или доступ запрещен.");
                 return false;
             }
+        }
+
+        function startMonitoring(stream, elementId, isLocal) {
+            const source = audioCtx.createMediaStreamSource(stream);
+            const node = audioCtx.createAnalyser();
+            node.fftSize = 256;
+            source.connect(node);
+            
+            const bufferLength = node.frequencyBinCount;
+            const data = new Uint8Array(bufferLength);
+
+            function draw() {
+                if (!document.getElementById(elementId)) return;
+                node.getByteFrequencyData(data);
+                
+                let sum = 0;
+                for(let i = 0; i < bufferLength; i++) {
+                    sum += data[i];
+                }
+                let volume = sum / bufferLength;
+
+                if (isLocal) {
+                    // Умножаем на 4 для большей чувствительности ползунка
+                    document.getElementById('v-fill').style.height = Math.min(volume * 4, 100) + "%";
+                }
+
+                const box = document.getElementById(elementId);
+                if (box && !box.classList.contains('video-box')) {
+                    let s = 1 + (volume / 200);
+                    box.style.transform = `scale(${s})`;
+                    box.style.borderColor = volume > 5 ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.1)";
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
         }
 
         async function createRoom() {
             if (await setupMedia()) {
                 showScreen('sc-call');
-                addUserToGrid(myStream, myNick, true);
+                addUserToGrid(myStream, myNick, 'box-me', true);
             }
         }
 
@@ -125,21 +179,18 @@
             if(!rid) return;
             if (await setupMedia()) {
                 showScreen('sc-call');
-                addUserToGrid(myStream, myNick, true);
+                addUserToGrid(myStream, myNick, 'box-me', true);
                 const call = peer.call(rid, myStream);
-                call.on('stream', userStream => {
-                    addUserToGrid(userStream, "REMOTE", false);
-                });
+                call.on('stream', userStream => addUserToGrid(userStream, "REMOTE", rid));
             }
         }
 
-        function addUserToGrid(stream, name, isMe = false) {
+        function addUserToGrid(stream, name, peerId, isMe = false) {
             const grid = document.getElementById('grid');
-            const id = isMe ? 'box-me' : 'box-remote' + Math.floor(Math.random()*100);
-            if (document.getElementById(id)) return;
+            if (document.getElementById(peerId)) return;
 
             const box = document.createElement('div');
-            box.id = id;
+            box.id = peerId;
             box.className = 'user-box';
             box.innerText = name[0].toUpperCase();
             
@@ -148,9 +199,9 @@
                 audio.srcObject = stream;
                 audio.autoplay = true;
                 box.appendChild(audio);
-                startAudioMonitor(stream, id, false);
+                // Мониторим партнера
+                if (audioCtx) startMonitoring(stream, peerId, false);
             }
-            
             grid.appendChild(box);
         }
 
@@ -177,31 +228,8 @@
             }
         }
 
-        function startAudioMonitor(stream, elementId, isLocal) {
-            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const src = audioCtx.createMediaStreamSource(stream);
-            const ans = audioCtx.createAnalyser();
-            ans.fftSize = 256;
-            src.connect(ans);
-            const data = new Uint8Array(ans.frequencyBinCount);
-
-            function loop() {
-                ans.getByteFrequencyData(data);
-                let vol = data.reduce((a, b) => a + b, 0) / data.length;
-                
-                if (isLocal) {
-                    document.getElementById('v-fill').style.height = Math.min(vol * 2.5, 100) + "%";
-                }
-
-                const targetBox = document.getElementById(elementId);
-                if (targetBox && !targetBox.classList.contains('video-box')) {
-                    targetBox.style.transform = `scale(${1 + vol/350})`;
-                    targetBox.style.borderColor = vol > 15 ? "#fff" : "rgba(255,255,255,0.1)";
-                    targetBox.style.boxShadow = vol > 15 ? `0 0 ${vol}px rgba(255,255,255,0.15)` : 'none';
-                }
-                requestAnimationFrame(loop);
-            }
-            loop();
+        function exitCall() {
+            location.reload(); 
         }
 
         function copyID() {
