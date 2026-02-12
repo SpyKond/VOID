@@ -8,69 +8,41 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;400;600&display=swap');
         :root { --bg: #050505; --card: rgba(255, 255, 255, 0.03); --border: rgba(255, 255, 255, 0.1); }
-
         body, html { margin: 0; padding: 0; height: 100%; background: var(--bg); color: #fff; font-family: 'Inter', sans-serif; overflow: hidden; }
-
-        /* Экраны */
-        .screen { 
-            display: none; flex-direction: column; align-items: center; justify-content: center; 
-            height: 100vh; width: 100vw; opacity: 0; transition: opacity 0.5s ease;
-        }
-        .screen.active { display: flex; opacity: 1; }
-
-        /* Элементы управления */
-        .btn {
-            background: var(--card); border: 1px solid var(--border); color: #fff;
-            padding: 18px 45px; border-radius: 12px; cursor: pointer;
-            letter-spacing: 3px; transition: 0.4s; font-size: 13px; font-weight: 600;
-        }
-        .btn:hover { background: #fff; color: #000; }
-
-        input {
-            background: none; border: none; border-bottom: 1px solid var(--border);
-            color: #fff; font-size: 24px; text-align: center; padding: 15px; outline: none; margin-bottom: 40px;
-        }
-
-        #room-id-header {
-            position: fixed; top: 40px; left: 50%; transform: translateX(-50%);
-            font-size: 14px; color: rgba(255,255,255,0.3); letter-spacing: 5px; cursor: pointer; display: none;
-        }
-
-        /* Сетка */
-        .participants-container { display: flex; gap: 30px; justify-content: center; align-items: center; width: 90%; }
         
-        .user-box {
-            width: 220px; height: 280px; background: var(--card); border: 1px solid var(--border);
-            border-radius: 40px; display: flex; align-items: center; justify-content: center;
-            font-size: 80px; font-weight: 200; transition: all 0.2s ease;
-        }
-
+        .screen { display: none; flex-direction: column; align-items: center; justify-content: center; height: 100vh; width: 100vw; opacity: 0; transition: opacity 0.5s ease; }
+        .screen.active { display: flex; opacity: 1; }
+        
+        .btn { background: var(--card); border: 1px solid var(--border); color: #fff; padding: 18px 45px; border-radius: 12px; cursor: pointer; letter-spacing: 3px; transition: 0.4s; font-size: 13px; font-weight: 600; outline: none; }
+        .btn:hover { background: #fff; color: #000; }
+        
+        input { background: none; border: none; border-bottom: 1px solid var(--border); color: #fff; font-size: 24px; text-align: center; padding: 15px; outline: none; margin-bottom: 40px; width: 280px; }
+        
+        #room-id-header { position: fixed; top: 40px; left: 50%; transform: translateX(-50%); font-size: 14px; color: rgba(255,255,255,0.3); letter-spacing: 5px; cursor: pointer; display: none; z-index: 1000; }
+        
+        .participants-container { display: flex; gap: 30px; justify-content: center; align-items: center; width: 90%; flex-wrap: wrap; }
+        
+        .user-box { width: 220px; height: 280px; background: var(--card); border: 1px solid var(--border); border-radius: 40px; display: flex; align-items: center; justify-content: center; font-size: 80px; font-weight: 200; transition: transform 0.1s ease, border-color 0.2s, box-shadow 0.2s; position: relative; }
+        
         .video-box { width: 350px; height: 500px; background: #000; border-radius: 40px; overflow: hidden; border: 1px solid var(--border); }
         video { width: 100%; height: 100%; object-fit: cover; }
-
-        .dock {
-            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
-            background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(20px);
-            padding: 15px 30px; border-radius: 30px; border: 1px solid var(--border);
-            display: flex; gap: 25px;
-        }
-        .c-btn {
-            width: 50px; height: 50px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1);
-            color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px;
-        }
+        
+        .dock { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(20px); padding: 15px 30px; border-radius: 30px; border: 1px solid var(--border); display: flex; gap: 25px; }
+        
+        .c-btn { width: 50px; height: 50px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: 0.3s; }
         .c-btn.off { color: #ff3b30; border-color: #ff3b30; }
-
+        
         .v-bar { position: fixed; bottom: 40px; right: 40px; width: 4px; height: 80px; background: rgba(255,255,255,0.05); }
         #v-fill { width: 100%; height: 0%; background: #fff; position: absolute; bottom: 0; transition: height 0.1s; }
     </style>
 </head>
-<body>
+<body onload="initPeer()">
 
     <div id="room-id-header" onclick="copyID()">ROOM: <span id="id-val">---</span></div>
 
     <div id="sc-nick" class="screen active">
         <h1 style="letter-spacing: 10px; font-weight: 200;">VOID</h1>
-        <input type="text" id="nick-in" placeholder="NICKNAME">
+        <input type="text" id="nick-in" placeholder="NICKNAME" autocomplete="off" onkeydown="if(event.key==='Enter') confirmNick()">
         <button class="btn" onclick="confirmNick()">INITIALIZE</button>
     </div>
 
@@ -80,7 +52,7 @@
     </div>
 
     <div id="sc-join" class="screen">
-        <input type="text" id="join-in" placeholder="SESSION ID">
+        <input type="text" id="join-in" placeholder="SESSION ID" autocomplete="off" onkeydown="if(event.key==='Enter') joinRoom()">
         <button class="btn" onclick="joinRoom()">ESTABLISH</button>
         <p onclick="showScreen('sc-menu')" style="cursor:pointer; font-size:10px; margin-top:20px; color:#444;">BACK</p>
     </div>
@@ -98,6 +70,7 @@
 
     <script>
         let myNick = "User", peer, myStream, myId, isCam = false;
+        let audioCtx;
 
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => {
@@ -119,15 +92,29 @@
             myId = Math.random().toString(36).substring(2, 7).toUpperCase();
             peer = new Peer(myId);
             peer.on('open', id => document.getElementById('id-val').innerText = id);
+            
             peer.on('call', call => {
                 call.answer(myStream);
-                call.on('stream', userStream => addUserToGrid(userStream, "PARTNER"));
+                call.on('stream', userStream => {
+                    addUserToGrid(userStream, "PARTNER", false);
+                });
             });
         }
 
+        async function setupMedia() {
+            try {
+                myStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+                myStream.getVideoTracks()[0].enabled = false;
+                startAudioMonitor(myStream, 'box-me', true);
+                return true;
+            } catch (e) {
+                alert("Ошибка доступа. Проверьте камеру и микрофон.");
+                return false;
+            }
+        }
+
         async function createRoom() {
-            const success = await setupMedia();
-            if (success) {
+            if (await setupMedia()) {
                 showScreen('sc-call');
                 addUserToGrid(myStream, myNick, true);
             }
@@ -136,36 +123,34 @@
         async function joinRoom() {
             const rid = document.getElementById('join-in').value.toUpperCase();
             if(!rid) return;
-            const success = await setupMedia();
-            if (success) {
+            if (await setupMedia()) {
                 showScreen('sc-call');
                 addUserToGrid(myStream, myNick, true);
                 const call = peer.call(rid, myStream);
-                call.on('stream', userStream => addUserToGrid(userStream, "REMOTE"));
-            }
-        }
-
-        async function setupMedia() {
-            try {
-                myStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-                myStream.getVideoTracks()[0].enabled = false;
-                startAudioMonitor(myStream);
-                return true;
-            } catch (e) {
-                alert("Ошибка доступа к камере/микрофону. Убедитесь, что дали разрешение.");
-                return false;
+                call.on('stream', userStream => {
+                    addUserToGrid(userStream, "REMOTE", false);
+                });
             }
         }
 
         function addUserToGrid(stream, name, isMe = false) {
             const grid = document.getElementById('grid');
-            const id = isMe ? 'box-me' : 'box-remote';
+            const id = isMe ? 'box-me' : 'box-remote' + Math.floor(Math.random()*100);
             if (document.getElementById(id)) return;
 
             const box = document.createElement('div');
             box.id = id;
             box.className = 'user-box';
             box.innerText = name[0].toUpperCase();
+            
+            if (!isMe) {
+                const audio = document.createElement('audio');
+                audio.srcObject = stream;
+                audio.autoplay = true;
+                box.appendChild(audio);
+                startAudioMonitor(stream, id, false);
+            }
+            
             grid.appendChild(box);
         }
 
@@ -180,31 +165,39 @@
             myStream.getVideoTracks()[0].enabled = isCam;
             document.getElementById('v-btn').classList.toggle('off', !isCam);
             const me = document.getElementById('box-me');
-            me.className = isCam ? 'video-box' : 'user-box';
             if (isCam) {
+                me.className = 'video-box';
                 const v = document.createElement('video');
                 v.id = "v-me"; v.autoplay = true; v.muted = true; v.playsinline = true;
                 me.innerHTML = ""; me.appendChild(v);
                 v.srcObject = myStream;
             } else {
+                me.className = 'user-box';
                 me.innerHTML = myNick[0].toUpperCase();
             }
         }
 
-        function startAudioMonitor(stream) {
-            const ctx = new AudioContext();
-            const src = ctx.createMediaStreamSource(stream);
-            const ans = ctx.createAnalyser();
+        function startAudioMonitor(stream, elementId, isLocal) {
+            if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const src = audioCtx.createMediaStreamSource(stream);
+            const ans = audioCtx.createAnalyser();
+            ans.fftSize = 256;
             src.connect(ans);
             const data = new Uint8Array(ans.frequencyBinCount);
+
             function loop() {
                 ans.getByteFrequencyData(data);
                 let vol = data.reduce((a, b) => a + b, 0) / data.length;
-                document.getElementById('v-fill').style.height = (vol * 2) + "%";
-                const me = document.getElementById('box-me');
-                if (me && !isCam) {
-                    me.style.transform = `scale(${1 + vol/400})`;
-                    me.style.boxShadow = vol > 10 ? `0 0 30px rgba(255,255,255,0.1)` : 'none';
+                
+                if (isLocal) {
+                    document.getElementById('v-fill').style.height = Math.min(vol * 2.5, 100) + "%";
+                }
+
+                const targetBox = document.getElementById(elementId);
+                if (targetBox && !targetBox.classList.contains('video-box')) {
+                    targetBox.style.transform = `scale(${1 + vol/350})`;
+                    targetBox.style.borderColor = vol > 15 ? "#fff" : "rgba(255,255,255,0.1)";
+                    targetBox.style.boxShadow = vol > 15 ? `0 0 ${vol}px rgba(255,255,255,0.15)` : 'none';
                 }
                 requestAnimationFrame(loop);
             }
@@ -212,14 +205,12 @@
         }
 
         function copyID() {
-            navigator.clipboard.writeText(myId);
+            const val = document.getElementById('id-val').innerText;
+            navigator.clipboard.writeText(val);
             const h = document.getElementById('room-id-header');
             h.innerText = "COPIED!";
-            setTimeout(() => h.innerHTML = `ROOM: <span id="id-val">${myId}</span>`, 1000);
+            setTimeout(() => h.innerHTML = `ROOM: <span id="id-val">${val}</span>`, 1000);
         }
-
-        initPeer();
     </script>
 </body>
-
 </html>
